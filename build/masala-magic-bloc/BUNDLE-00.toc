@@ -1,0 +1,3 @@
+([('masala-magic-bloc',
+   '/Users/vithusangopalapillai/Documents/masala-magic/logiciel-devis/dist/masala-magic-bloc',
+   'EXECUTABLE')],)
