@@ -38,11 +38,33 @@ func getAvailableFont() string {
 	return "/System/Library/Fonts/Helvetica.ttc"
 }
 
+func generateTicketNumber() string {
+	date := time.Now().Format("20060102") // Format: YYYYMMDD
+
+	// Fichier pour stocker le dernier numéro utilisé par jour
+	counterFile := "ticket_counter_" + date + ".txt"
+
+	var count int
+
+	if data, err := os.ReadFile(counterFile); err == nil {
+		count, _ = strconv.Atoi(string(data))
+	}
+	count++
+
+	// Sauvegarde le nouveau numéro
+	_ = os.WriteFile(counterFile, []byte(strconv.Itoa(count)), 0644)
+
+	// Format final
+	return fmt.Sprintf("%s-%04d", date, count)
+}
+
 func generatePDF(nombrePersonnes, prixTotal, tvaRate string) {
 	prixTotalFloat := strToFloat(prixTotal)
 	tvaRateFloat := strToFloat(tvaRate) / 100
 	tva := prixTotalFloat * tvaRateFloat
 	totalHT := prixTotalFloat - tva
+
+	ticketRef := generateTicketNumber()
 
 	pdf := gopdf.GoPdf{}
 	pdf.Start(gopdf.Config{PageSize: gopdf.Rect{W: 175, H: 283}})
@@ -94,11 +116,12 @@ func generatePDF(nombrePersonnes, prixTotal, tvaRate string) {
 	centerText("Téléphone: 0140560943")
 	centerText("SIRET: 84847312000022")
 	centerText("TVA: FR80848473120")
+	centerText("TICKET : " + ticketRef)
 
 	pdf.Br(10)
 
 	pdf.SetFont("font", "", 10)
-	pdf.SetY(160)
+	pdf.SetY(170)
 
 	// Fonction pour aligner un texte à gauche et un autre à droite sur la même ligne
 	drawLine := func(leftText, rightText string) {
@@ -134,13 +157,13 @@ func generatePDF(nombrePersonnes, prixTotal, tvaRate string) {
 	}
 
 	// Sauvegarde dans CSV
-	saveToCSV(nombrePersonnes, prixTotalFloat, totalHT, prixTotalFloat, tva, tvaRate)
+	saveToCSV(ticketRef, nombrePersonnes, prixTotalFloat, totalHT, prixTotalFloat, tva, tvaRate)
 
 	// Imprimer automatiquement après la génération
 	printPDF("bloc_repas.pdf")
 }
 
-func saveToCSV(nombrePersonnes string, prixTotal, totalHT, totalTTC, tva float64, tvaRate string) {
+func saveToCSV(ticketRef, nombrePersonnes string, prixTotal, totalHT, totalTTC, tva float64, tvaRate string) {
 	file, err := os.OpenFile("commandes.csv", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		fmt.Println("Erreur d'ouverture du fichier CSV:", err)
@@ -153,7 +176,7 @@ func saveToCSV(nombrePersonnes string, prixTotal, totalHT, totalTTC, tva float64
 
 	stat, _ := file.Stat()
 	if stat.Size() == 0 {
-		err := writer.Write([]string{"Nombre de personnes", "Prix Total (TTC)", "Total HT", "Total TTC", "TVA", "TVA (%)"})
+		err := writer.Write([]string{"TICKET", "Nombre de personnes", "Prix Total (TTC)", "Total HT", "Total TTC", "TVA", "TVA (%)"})
 		if err != nil {
 			fmt.Println("Erreur d'écriture de l'entête CSV:", err)
 			return
@@ -161,6 +184,7 @@ func saveToCSV(nombrePersonnes string, prixTotal, totalHT, totalTTC, tva float64
 	}
 
 	err = writer.Write([]string{
+		ticketRef,
 		nombrePersonnes,
 		fmt.Sprintf("%0.2f", prixTotal),
 		fmt.Sprintf("%0.2f", totalHT),
